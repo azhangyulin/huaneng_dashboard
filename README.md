@@ -11,9 +11,13 @@
 - 📊 各省份电量排名
 - 🏭 按发电类型（火电/风电/光伏/水电/其他）分类统计
 
-## 🚀 使用方式
+## 🌐 在线访问
 
-直接在浏览器中打开 `huaneng_dashboard.html`，或部署到任意静态文件服务器。
+GitHub Pages 部署：[**https://azhangyulin.github.io/huaneng_dashboard/**](https://azhangyulin.github.io/huaneng_dashboard/)
+
+## 🚀 本地运行
+
+直接用浏览器打开 `huaneng_dashboard.html` 即可运行，无需安装依赖或启动服务器。
 
 ## 📁 文件说明
 
