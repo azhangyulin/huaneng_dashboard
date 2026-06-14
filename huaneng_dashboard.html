@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>华能国际 2025年全年上网电量 - 大数据看板</title>
+<script src="echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e27; color: #fff; font-family: 'Microsoft YaHei', sans-serif; height: 100vh; overflow: hidden; }
+.loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0e27;
+  display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.loading-overlay .spinner { color: #00e5ff; font-size: 18px; }
+.dashboard { display: none; grid-template-columns: 260px 1fr 280px; grid-template-rows: 60px 1fr;
+  height: 100vh; padding: 8px; gap: 8px; }
+.header { grid-column: 1/4; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 15px; background: linear-gradient(90deg, #0d1230, #1a1f4e, #0d1230); border-radius: 6px; }
+.header h1 { font-size: 21px; color: #00e5ff; letter-spacing: 1px; }
+.header .sub { font-size: 11px; color: #7b8ab8; }
+.stats-row { display: flex; gap: 20px; }
+.stat-box { text-align: center; }
+.stat-box .val { font-size: 18px; font-weight: bold; }
+.stat-box .val.c { color: #00e5ff; } .stat-box .val.g { color: #4caf50; } .stat-box .val.r { color: #ff5252; }
+.stat-box .label { font-size: 10px; color: #7b8ab8; margin-top: 1px; }
+.left-panel, .right-panel { display: flex; flex-direction: column; gap: 8px; }
+.center-panel { position: relative; }
+.card { background: rgba(13,18,48,0.9); border: 1px solid rgba(0,229,255,0.12);
+  border-radius: 6px; padding: 10px; flex: 1; }
+.card h3 { font-size: 12px; color: #00e5ff; margin-bottom: 4px; padding-bottom: 4px;
+  border-bottom: 1px solid rgba(0,229,255,0.1); }
+.chart { width: 100%; height: calc(100% - 26px); }
+#mapChart { width: 100%; height: 100%; }
+.source { font-size: 9px; color: #3a4068; position: absolute; bottom: 3px; right: 10px; }
+</style>
+</head>
+<body>
+<div class="loading-overlay" id="loading"><div class="spinner">&#x23F3; 加载中国地图数据...</div></div>
+<div class="dashboard" id="dashboard">
+<div class="header">
+<div>
+<h1>华能国际 2025年全年上网电量大数据看板</h1>
+<div class="sub">公告2026-003 | 26省/区 4,375.63亿kWh &#x2193;3.39% | 均价477.08元/MWh | 市场化85.43% | 清洁能源占比15.6%</div>
+</div>
+<div class="stats-row">
+<div class="stat-box"><div class="val r">-3.39%</div><div class="label">总电量同比</div></div>
+<div class="stat-box"><div class="val c">477.08</div><div class="label">均价(元/MWh)</div></div>
+<div class="stat-box"><div class="val c">26省</div><div class="label">覆盖范围</div></div>
+<div class="stat-box"><div class="val g">+42.8%</div><div class="label">光伏增速</div></div>
+<div class="stat-box"><div class="val g">+10.6%</div><div class="label">风电增速</div></div>
+<div class="stat-box"><div class="val g">15.6%</div><div class="label">清洁能源占比</div></div>
+</div>
+</div>
+<div class="left-panel">
+<div class="card"><h3>&#x26A1; 机组类型构成</h3><div class="chart" id="typeChart"></div></div>
+<div class="card"><h3>&#x1F4CA; 各省同比增减(%)</h3><div class="chart" id="yoyChart"></div></div>
+</div>
+<div class="center-panel">
+<div id="mapChart"></div>
+<div class="source">中国地图 · 华能国际电力股份有限公司 公告编号：2026-003</div>
+</div>
+<div class="right-panel">
+<div class="card"><h3>&#x1F3ED; Top10省份装机类型构成</h3><div class="chart" id="stackChart"></div></div>
+<div class="card"><h3>&#x1F331; 清洁能源占比排行(%)</h3><div class="chart" id="cleanChart"></div></div>
+</div>
+</div>
+<script>
+// === DATA: 26 provinces ===
+var pd = {
+    // 东北
+    '黑龙江省':{t:130.74,y:1.54,c:98.26,g:0,w:28.29,s:2.55,h:0,b:1.64},
+    '吉林省':{t:120.38,y:-0.96,c:65.49,g:0,w:47.13,s:4.50,h:0.84,b:2.42},
+    '辽宁省':{t:173.30,y:5.33,c:138.13,g:0,w:32.27,s:2.61,h:0.31,b:0},
+    // 华北
+    '内蒙古自治区':{t:7.44,y:1.81,c:0,g:0,w:7.08,s:0.37,h:0,b:0},
+    '河北省':{t:153.67,y:16.34,c:105.84,g:0,w:12.36,s:35.47,h:0,b:0},
+    '北京市':{t:75.99,y:1.55,c:0.78,g:75.21,w:0,s:0,h:0,b:0},
+    '天津市':{t:46.60,y:-18.36,c:38.35,g:6.37,w:0.84,s:1.04,h:0,b:0},
+    '山西省':{t:103.88,y:4.44,c:54.01,g:20.75,w:6.92,s:22.20,h:0,b:0},
+    // 华东
+    '山东省':{t:711.13,y:-10.78,c:634.77,g:2.27,w:36.15,s:34.45,h:0,b:3.49},
+    '江苏省':{t:414.20,y:-7.68,c:280.42,g:58.89,w:46.90,s:27.99,h:0,b:0},
+    '上海市':{t:203.29,y:-4.53,c:186.00,g:16.04,w:0,s:1.25,h:0,b:0},
+    '浙江省':{t:355.02,y:-0.96,c:299.84,g:11.73,w:37.70,s:5.74,h:0,b:0},
+    '安徽省':{t:96.89,y:12.47,c:59.92,g:0,w:14.62,s:21.87,h:0.48,b:0},
+    '福建省':{t:180.34,y:-3.90,c:175.56,g:0,w:0,s:4.78,h:0,b:0},
+    '江西省':{t:291.76,y:-1.56,c:255.04,g:0,w:9.08,s:27.64,h:0,b:0},
+    // 华中
+    '河南省':{t:239.18,y:-1.72,c:187.53,g:1.67,w:39.65,s:10.33,h:0,b:0},
+    '湖北省':{t:146.67,y:-11.10,c:119.42,g:0,w:6.61,s:18.15,h:2.49,b:0},
+    '湖南省':{t:86.87,y:-2.65,c:69.92,g:0,w:8.20,s:5.91,h:2.83,b:0},
+    // 西北
+    '甘肃省':{t:113.23,y:-4.67,c:93.98,g:0,w:19.25,s:0,h:0,b:0},
+    '宁夏回族自治区':{t:0.21,y:2.15,c:0,g:0,w:0,s:0.21,h:0,b:0},
+    // 华南
+    '广东省':{t:290.87,y:0.50,c:237.82,g:33.28,w:16.25,s:3.52,h:0,b:0},
+    '广西壮族自治区':{t:12.66,y:18.13,c:0,g:3.12,w:6.45,s:3.09,h:0,b:0},
+    '海南省':{t:137.57,y:5.09,c:98.96,g:18.89,w:12.28,s:5.08,h:2.35,b:0},
+    // 西南
+    '重庆市':{t:155.45,y:0.53,c:107.53,g:41.06,w:6.32,s:0.53,h:0,b:0},
+    '云南省':{t:113.92,y:-19.42,c:94.02,g:0,w:12.39,s:7.09,h:0.42,b:0},
+    '贵州省':{t:14.35,y:11.52,c:0,g:0,w:1.92,s:12.43,h:0,b:0}
+};
+var pn = Object.keys(pd);
+var n26 = pn.length; // 26
+
+// Verify total
+var sum = 0; pn.forEach(function(k){sum+=pd[k].t;});
+console.log('Verified total:',sum.toFixed(2),'of 4375.63');
+
+fetch('china_geojson.json').then(function(r){return r.json();}).then(function(geo){
+document.getElementById('loading').style.display='none';
+document.getElementById('dashboard').style.display='grid';
+echarts.registerMap('china',geo);
+
+var colors = {coal:'#ff7043',gas:'#ffa726',wind:'#29b6f6',solar:'#ffca28',hydro:'#26c6da',bio:'#ab47bc'};
+
+// === MAP ===
+var mapChart = echarts.init(document.getElementById('mapChart'));
+mapChart.setOption({
+tooltip:{trigger:'item',backgroundColor:'rgba(6,12,28,0.92)',borderColor:'rgba(0,229,255,0.3)',
+textStyle:{color:'#ccc',fontSize:12},
+formatter:function(p){if(!p.data||!p.data._d)return p.name;var d=p.data._d;
+var s=d.y>=0?'+':'';var c=d.y>=0?'#4caf50':'#ff5252';
+var h='<b style="color:#00e5ff;font-size:14px;">'+p.name+'</b><br>';
+h+='电量: <b style="color:#fff;font-size:13px;">'+d.t.toFixed(2)+'</b> 亿kWh<br>';
+h+='同比: <span style="color:'+c+'">'+s+d.y.toFixed(2)+'%</span><hr style="margin:4px 0;border-color:#333">';
+[['煤',d.c,'#ff7043'],['燃',d.g,'#ffa726'],['风',d.w,'#29b6f6'],['光',d.s,'#ffca28'],['水',d.h,'#26c6da'],['生',d.b,'#ab47bc']].forEach(function(t){
+if(t[1]>0)h+='<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+t[2]+';margin:0 2px 0 6px;"></span>'+t[0]+':'+t[1].toFixed(1);});
+return h;}},
+visualMap:{min:0,max:720,text:['高','低'],realtime:false,calculable:true,
+inRange:{color:['#0d2137','#0e3a5c','#1a5a8a','#2d7fb7','#4ca3dd','#80c8ff']},
+textStyle:{color:'#7b8ab8'},left:6,bottom:12},
+geo:{map:'china',roam:true,zoom:1.1,center:[106,35],
+label:{show:true,fontSize:8,color:'#6a7a9a'},
+emphasis:{label:{show:true,fontSize:13,color:'#fff'},itemStyle:{areaColor:'#ffd54f'}},
+itemStyle:{areaColor:'#1a254a',borderColor:'#2a3f6a',borderWidth:1}},
+series:[{type:'map',map:'china',geoIndex:0,
+data:pn.map(function(k){var d=pd[k];
+return {name:k,value:d.t,_d:d,itemStyle:{areaColor:d.y>=0?'#1b3a5c':'#3a1b2c'}};})},
+{type:'scatter',coordinateSystem:'geo',
+symbolSize:function(v){return Math.max(5,Math.sqrt(v)*1.1);},
+itemStyle:{color:'#00e5ff',borderColor:'#fff',borderWidth:1,shadowBlur:8,shadowColor:'rgba(0,229,255,0.3)'},
+label:{show:true,formatter:function(p){return p.value.toFixed(0);},position:'right',fontSize:8,color:'#8ab4f8'},
+data:pn.map(function(k){var d=pd[k];return {name:k,value:d.t,_d:d};})}]
+});
+
+// === PIE: Type Breakdown ===
+var typeChart = echarts.init(document.getElementById('typeChart'));
+typeChart.setOption({tooltip:{trigger:'item',formatter:'{b}: {c}亿kWh ({d}%)'},
+color:['#ff7043','#ffa726','#29b6f6','#ffca28','#26c6da','#ab47bc'],
+series:[{type:'pie',radius:['42%','72%'],center:['50%','52%'],label:{fontSize:9,color:'#889'},
+data:[
+{value:3401.59,name:'煤机'},{value:289.30,name:'燃机'},{value:408.65,name:'风电'},
+{value:258.81,name:'光伏'},{value:9.72,name:'水电'},{value:7.56,name:'生物'}]
+}]});
+
+// === BAR: YoY by Province ===
+var yoyChart = echarts.init(document.getElementById('yoyChart'));
+// Sort by yoy descending (largest positive at top)
+var yoyItems = pn.map(function(k){return {n:k,v:pd[k].y};}).sort(function(a,b){return b.v-a.v;});
+yoyChart.setOption({tooltip:{trigger:'axis',formatter:'{b}: {c}%'},
+grid:{left:55,right:18,top:2,bottom:2},
+xAxis:{type:'value',axisLabel:{fontSize:8,color:'#556'},splitLine:{lineStyle:{color:'rgba(255,255,255,0.04)'}}},
+yAxis:{type:'category',data:yoyItems.map(function(x){return x.n;}),axisLabel:{fontSize:8,color:'#99a'},axisLine:{show:false},axisTick:{show:false}},
+series:[{type:'bar',data:yoyItems.map(function(x){return x.v;}),
+itemStyle:{color:function(p){return p.value>=0?'#4caf50':'#ff5252';},borderRadius:[0,2,2,0]},
+label:{show:true,position:'right',fontSize:7,color:'#aaa',
+formatter:function(p){return p.value>=0?'+'+p.value+'%':p.value+'%';}}}]});
+
+// === STACKED BAR: Top 10 Provinces ===
+var stackChart = echarts.init(document.getElementById('stackChart'));
+// Sort by total descending, take top 10
+var top10 = pn.slice().sort(function(a,b){return pd[b].t-pd[a].t;}).slice(0,10);
+// For bar chart: largest at top = first in data (ECharts renders first at top)
+// So put largest province first in the data arrays
+var stLabels = top10.slice().reverse(); // Largest (山东) at top
+stackChart.setOption({tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+grid:{left:55,right:8,top:2,bottom:2},
+xAxis:{type:'value',axisLabel:{fontSize:8,color:'#556'},splitLine:{lineStyle:{color:'rgba(255,255,255,0.04)'}}},
+yAxis:{type:'category',data:stLabels,axisLabel:{fontSize:8,color:'#99a'},axisLine:{show:false},axisTick:{show:false}},
+legend:{show:false},
+series:[
+{name:'煤机',type:'bar',stack:'t',data:stLabels.map(function(k){return pd[k].c;}),itemStyle:{color:'#ff7043'}},
+{name:'燃机',type:'bar',stack:'t',data:stLabels.map(function(k){return pd[k].g;}),itemStyle:{color:'#ffa726'}},
+{name:'风电',type:'bar',stack:'t',data:stLabels.map(function(k){return pd[k].w;}),itemStyle:{color:'#29b6f6'}},
+{name:'光伏',type:'bar',stack:'t',data:stLabels.map(function(k){return pd[k].s;}),itemStyle:{color:'#ffca28'}},
+{name:'水电',type:'bar',stack:'t',data:stLabels.map(function(k){return pd[k].h;}),itemStyle:{color:'#26c6da'}},
+{name:'生物',type:'bar',stack:'t',data:stLabels.map(function(k){return pd[k].b;}),itemStyle:{color:'#ab47bc'}}
+]});
+
+// === BAR: Clean Energy Ratio ===
+var cleanChart = echarts.init(document.getElementById('cleanChart'));
+var cleanItems = pn.map(function(k){
+var d=pd[k]; return {n:k,r:parseFloat(((d.w+d.s+d.h+d.b)/d.t*100).toFixed(1))};
+}).sort(function(a,b){return b.r-a.r;});
+cleanChart.setOption({tooltip:{trigger:'axis',formatter:'{b}: {c}%'},
+grid:{left:55,right:18,top:2,bottom:2},
+xAxis:{type:'value',axisLabel:{fontSize:8,color:'#556',formatter:'{value}%'},splitLine:{lineStyle:{color:'rgba(255,255,255,0.04)'}}},
+yAxis:{type:'category',data:cleanItems.map(function(x){return x.n;}),axisLabel:{fontSize:8,color:'#99a'},axisLine:{show:false},axisTick:{show:false}},
+series:[{type:'bar',data:cleanItems.map(function(x){return x.r;}),
+itemStyle:{color:function(p){return p.value>=30?'#4caf50':p.value>=10?'#ffa726':'#666';},borderRadius:[0,2,2,0]},
+label:{show:true,position:'right',fontSize:7,color:'#aaa',formatter:function(p){return p.value+'%';}}}]});
+
+window.addEventListener('resize',function(){[mapChart,typeChart,yoyChart,stackChart,cleanChart].forEach(function(c){c.resize();});});
+}).catch(function(e){document.getElementById('loading').innerHTML='<span style="color:#ff5252">加载失败: '+e.message+'</span>';});
+</script>
+</body>
+</html>
