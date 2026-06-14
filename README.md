@@ -24,6 +24,4 @@
 | `china_geojson.json` | 中国地图 GeoJSON 数据 |
 | `huaneng_dashboard.png` | 预览截图 |
 
-## 📸 预览
 
-![华能国际 2025年上网电量看板](huaneng_dashboard.png)
